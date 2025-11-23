@@ -2,7 +2,7 @@ import streamlit as st
 from g2pk import G2p
 
 # ==========================================
-# 1. 页面配置 & CSS (黑白极简 + 蓝色高亮 + 按钮居中优化)
+# 1. 页面配置 & CSS
 # ==========================================
 st.set_page_config(page_title="Korean Pronunciation Converter", layout="centered")
 
@@ -13,28 +13,32 @@ custom_css = """
         color: #000000;
         font-family: -apple-system, BlinkMacSystemFont, sans-serif;
     }
-    /* 输入框样式 */
     .stTextArea textarea {
         font-size: 16px;
         border: 1px solid #333;
         border-radius: 4px;
     }
-    /* 按钮样式 */
-    .stButton>button {
-        width: 100%;
+    /* 按钮强制居中 */
+    .stButton {
+        display: flex;
+        justify-content: center;
+    }
+    .stButton > button {
+        width: 50% !important;
+        min-width: 200px;
         background-color: #000000;
         color: #FFFFFF;
         border: none;
-        height: 45px; /* 稍微调矮一点，更精致 */
+        height: 45px;
         font-weight: bold;
         font-size: 16px;
         letter-spacing: 1px;
+        margin-top: 10px;
     }
     .stButton>button:hover {
         background-color: #333333;
         color: #FFFFFF;
     }
-    /* 结果卡片 */
     .result-card {
         border: 1px solid #000000;
         padding: 20px;
@@ -50,7 +54,7 @@ custom_css = """
         font-weight: bold;
     }
     .pronunciation-text {
-        color: #1E88E5; /* 核心蓝色 */
+        color: #1E88E5;
         font-size: 18px;
         font-weight: 500;
         word-wrap: break-word;
@@ -62,11 +66,13 @@ custom_css = """
 st.markdown(custom_css, unsafe_allow_html=True)
 
 # ==========================================
-# 2. 初始化引擎
+# 2. 初始化引擎 (关键修改：关闭描述性模式)
 # ==========================================
 @st.cache_resource
 def load_g2p():
-    return G2p()
+    # descriptive=False: 强制使用“标准发音法”，避免过度连音
+    # group_vowels=False: 避免元音过度融合
+    return G2p(descriptive=False, group_vowels=False)
 
 try:
     g2p = load_g2p()
@@ -79,26 +85,18 @@ except Exception:
 # ==========================================
 st.markdown("<h1 style='text-align: center; font-size: 24px; margin-bottom: 30px;'>한국어 발음 변환기</h1>", unsafe_allow_html=True)
 
-# 输入框
 user_input = st.text_area("Input", height=150, label_visibility="collapsed", placeholder="Paste Korean text here...")
 
-# --- 按钮居中布局 ---
-st.write("") # 加一点空行
-col1, col2, col3 = st.columns([1, 2, 1]) # 左1份，中2份，右1份
+st.write("") 
 
-with col2: # 按钮放在中间的格子里
-    analyze_click = st.button("ANALYZE")
-
-# --- 点击后的逻辑 ---
-if analyze_click:
+if st.button("ANALYZE"):
     if user_input.strip():
-        # 预处理
+        # 预处理：将换行符替换为“空格”，而不是“空”
+        # 这样可以保证单词之间有间隔，防止 '때는' 和 '아직' 粘在一起导致连音
         clean_text = user_input.replace('\n', ' ').replace('\r', ' ')
         
-        # 转换
         pronunciation = g2p(clean_text)
 
-        # 显示结果
         st.markdown(f"""
         <div class="result-card">
             <div class="label-text">PRONUNCIATION</div>
