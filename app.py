@@ -2,7 +2,7 @@ import re
 import streamlit as st
 
 # ==========================================
-# 0. g2pk 导入
+# 0. 尝试导入 g2pk
 # ==========================================
 try:
     from g2pk import G2p
@@ -85,7 +85,15 @@ except Exception as e:
     st.stop()
 
 # ==========================================
-# 3. 一般清理：空格 / 标点
+# 3. URL 参数：支持 ?q=검색어 （给欧路词典等用）
+# ==========================================
+query_params = st.experimental_get_query_params()
+auto_word = query_params.get("q", [""])[0]
+auto_word = auto_word.strip()
+auto_run = bool(auto_word)
+
+# ==========================================
+# 4. 一般清理：空格 / 标点
 # ==========================================
 def normalize_spaces(text: str) -> str:
     # 连续空格压成一个
@@ -96,17 +104,15 @@ def normalize_spaces(text: str) -> str:
     return text.strip()
 
 # ==========================================
-# 4. 釜大风格音变补丁层（比原始 g2pk 更接近釜山大转换器）
+# 5. 釜大风格音变补丁层
 # ==========================================
 def apply_pnu_rules(text: str) -> str:
     """
-    在 g2pk 的基础发音结果上，叠加一层“釜大风格”的规则。
-    这里只是第一版：先覆盖常见、明显的差异，
-    后续如果你发现新的例子，可以继续往下加规则。
+    在 g2pk 的基础发音结果上，加一层“釜大风格”修正。
+    可以根据需要继续往里加规则。
     """
 
-    # ---- 4.1 助词/语尾类：에는 → 에느 ----
-    # 顺序：先匹配长串，再匹配短串
+    # ---- 5.1 助词/语尾：에는 → 에느 ----
     particle_patches = [
         ("에는요", "에느요"),
         ("에는도", "에느도"),
@@ -117,15 +123,13 @@ def apply_pnu_rules(text: str) -> str:
     for before, after in particle_patches:
         text = text.replace(before, after)
 
-    # ---- 4.2 部分连音 / 비음화 / 경음화：일정 → 닐정 等 ----
-    # 这里只写了你已经发现、以及非常常用的一些模式，
-    # 以后可以继续加。
+    # ---- 5.2 常见连音 / 비음화 / 경음화 修正 ----
     pnu_patches = [
         ("일정", "닐정"),   # 일정 → 닐정
         ("일주", "닐주"),   # 일주 → 닐주
         ("물질", "물찔"),   # 물질 → 물찔
-        ("핣지", "핮지"),   # 예: 할지 → 핮지（如果前面已经变成 핣지）
-        # 你可以根据需要继续往下面追加规则
+        # 需要时可以继续添加：
+        # ("할지", "할지") 等等
     ]
     for before, after in pnu_patches:
         text = text.replace(before, after)
@@ -133,23 +137,22 @@ def apply_pnu_rules(text: str) -> str:
     return text
 
 # ==========================================
-# 5. “完整的釜大风格发音模块”
+# 6. “完整的釜大风格发音模块”
 # ==========================================
 def pnu_g2p(text: str) -> str:
     """
-    比单独 g2pk 更精确的版本：
-    1) 用 g2pk 先做形态分析 + 基础音变；
-    2) 再做一遍空格/标点清理；
-    3) 套用我们自定义的釜大风格规则。
+    1) 用 g2pk 做基础音变；
+    2) 清理空格/标点；
+    3) 用釜大规则修正；
     """
-    base = g2p(text)          # g2pk 基础发音
+    base = g2p(text)
     base = normalize_spaces(base)
     refined = apply_pnu_rules(base)
     refined = normalize_spaces(refined)
     return refined
 
 # ==========================================
-# 6. 界面逻辑
+# 7. 界面逻辑
 # ==========================================
 st.markdown(
     "<h1 style='text-align: center; font-size: 24px; margin-bottom: 30px;'>한국어 발음 변환기</h1>",
@@ -158,33 +161,45 @@ st.markdown(
 
 user_input = st.text_area(
     "Input",
+    value=auto_word,           # 如果是从 ?q= 进来，自动填入
     height=150,
     label_visibility="collapsed",
     placeholder="Paste Korean text here..."
 )
 st.write("")
 
-# 中间居中的按钮
+# 按钮放在中间列
 left_col, mid_col, right_col = st.columns([1, 2, 1])
 with mid_col:
     analyze_clicked = st.button("ANALYZE", use_container_width=True)
 
-# 点击按钮后处理
+# ==========================================
+# 8. 执行转换逻辑
+# ==========================================
+text_to_convert = None
+
 if analyze_clicked:
-    if user_input.strip():
-        clean_text = user_input.replace("\n", " ").replace("\r", " ")
-        try:
-            pronunciation = pnu_g2p(clean_text)
-            st.markdown(
-                f"""
-                <div class="result-card">
-                    <div class="label-text">PRONUNCIATION</div>
-                    <div class="pronunciation-text">[{pronunciation}]</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-        except Exception as e:
-            st.error(f"Analysis Failed: {e}")
-    else:
+    # 用户点按钮时，以当前文本框内容为准
+    text_to_convert = user_input.strip()
+elif auto_run:
+    # 没点按钮，但 URL 里带 q=，自动跑一次
+    text_to_convert = auto_word
+
+if text_to_convert:
+    clean_text = text_to_convert.replace("\n", " ").replace("\r", " ")
+    try:
+        pronunciation = pnu_g2p(clean_text)
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="label-text">PRONUNCIATION</div>
+                <div class="pronunciation-text">[{pronunciation}]</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    except Exception as e:
+        st.error(f"Analysis Failed: {e}")
+else:
+    if analyze_clicked:
         st.warning("Please enter text.")
