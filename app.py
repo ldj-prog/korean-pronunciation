@@ -112,7 +112,7 @@ except:
 if api_key:
     genai.configure(api_key=api_key)
     # 使用 Flash 模型以获得最快速度
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-pro')
 
 # 加载发音库
 try:
@@ -204,4 +204,5 @@ if st.button("ANALYZE"):
                 except Exception as e:
                     st.error(f"Translation Error: {e}")
         else:
+
             st.warning("Please configure your Google API Key to see translations.")
