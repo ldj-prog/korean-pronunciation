@@ -87,8 +87,8 @@ except Exception as e:
 # ==========================================
 # 3. URL 参数：支持 ?q=검색어 （给欧路词典等用）
 # ==========================================
-query_params = st.experimental_get_query_params()
-auto_word = query_params.get("q", [""])[0]
+query_params = st.query_params
+auto_word = query_params.get("q", "")
 auto_word = auto_word.strip()
 auto_run = bool(auto_word)
 
@@ -203,3 +203,4 @@ if text_to_convert:
 else:
     if analyze_clicked:
         st.warning("Please enter text.")
+
